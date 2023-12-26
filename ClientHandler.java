@@ -6,64 +6,72 @@ import java.util.ArrayList;
 import java.io.InputStreamReader;
 import java.io.OutputStreamWriter;
 
-
 public class ClientHandler implements Runnable {
   public static ArrayList<ClientHandler> clientHandlers = new ArrayList<ClientHandler>();
   private Socket socket;
-  private BufferedReader buffReader;
-  private BufferedWriter buffWriter;
+  private BufferedReader bufferedReader;
+  private BufferedWriter bufferedWriter;
   private String name;
 
   ClientHandler(Socket socket){
     try{
       this.socket = socket;
-      this.buffReader = new BufferedReader(new InputStreamReader(socket.getInputStream()));
-      this.buffWriter = new BufferedWriter(new OutputStreamWriter(socket.getOutputStream()));
-      this.name = buffReader.readLine();
+      this.bufferedReader = new BufferedReader(new InputStreamReader(socket.getInputStream()));
+      this.bufferedWriter = new BufferedWriter(new OutputStreamWriter(socket.getOutputStream()));
+      this.name = bufferedReader.readLine();
       clientHandlers.add(this);
-      broadcastMessage("SERVER " + name + "has joined the chat");
+      System.out.println("SERVER " + name + " is connected");
+      broadcastMessage("SERVER: " + name + " has joined the chat");
     }
     catch(IOException e){
-      closeAll(socket, buffReader, buffWriter);
+      closeAll(socket, bufferedReader, bufferedWriter);
       e.printStackTrace();
     }
   }
 
   @Override
   public void run() {
-    String message = "";
+    String message;
 
-    while (socket.isConnected()) {
-      try {
-        message = buffReader.readLine();
+    try{
+      while(socket.isConnected()){
+        message = bufferedReader.readLine();
         if(message == null){
           break;
         }
-        broadcastMessage(name + ": " + message);
-      } catch (IOException e) {
-        closeAll(socket, buffReader, buffWriter);
+        else{
+          broadcastMessage(name + " : " + message);
+        }
       }
+    }
+    catch(IOException e){
+      System.out.println("SERVER : " + name + " has stopped responding");
+    }
+    finally{
+      System.out.println("SERVER : " + name + " left");
+      closeAll(socket, bufferedReader, bufferedWriter);
     }
   }
 
   public void broadcastMessage(String message){
     for(ClientHandler clienthandler : clientHandlers){
       try{
-        if(this.name != clienthandler.name){
-          clienthandler.buffWriter.write(message);
-          clienthandler.buffWriter.newLine();
-          clienthandler.buffWriter.flush();
+        if(!clienthandler.name.equals(name)){
+          clienthandler.bufferedWriter.write(message);
+          clienthandler.bufferedWriter.newLine();
+          clienthandler.bufferedWriter.flush();
         }
       }
       catch(IOException e){
-        closeAll(socket, buffReader, buffWriter);
+        e.printStackTrace();
+        closeAll(socket, bufferedReader, bufferedWriter);
       }
     }
   }
 
   public void removeClienthandler() {
+    broadcastMessage("SERVER : " + name + " has left");
     clientHandlers.remove(this);
-    broadcastMessage("SERVER " + this.name + "has left");
   }
 
   public void closeAll(Socket socket, BufferedReader buffreader, BufferedWriter buffwriter){

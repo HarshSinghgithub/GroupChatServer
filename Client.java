@@ -8,73 +8,73 @@ import java.io.InputStreamReader;
 import java.io.OutputStreamWriter;
 
 public class Client {
-  Socket socket;
+  Socket clientSocket;
   BufferedReader bufferedReader;
   BufferedWriter bufferedWriter;
-  private String name;
 
   Client(Socket socket, String name) {
     try {
-      this.socket = socket;
-      this.name = name;
+      clientSocket = socket;
       this.bufferedReader = new BufferedReader(new InputStreamReader(socket.getInputStream()));
       this.bufferedWriter = new BufferedWriter(new OutputStreamWriter(socket.getOutputStream()));
-    } catch (IOException e) {
+
+      synchronized(bufferedWriter){
+        bufferedWriter.write(name);
+        bufferedWriter.newLine();
+        bufferedWriter.flush();
+      }
+    } 
+    catch (IOException e) {
       System.out.println("Client object not created");
       e.printStackTrace();
     }
   }
 
-  public void SendMessage() {
+  public void SendMessage(String message) {
     try {
-      bufferedWriter.write(name);
-      bufferedWriter.newLine();
-      bufferedWriter.flush();
-
-      Scanner sc = new Scanner(System.in);
-
-      while (socket.isConnected()) {
-        synchronized(bufferedWriter){
-        String message = sc.nextLine();
-        bufferedWriter.write(name + "." + message);
+      synchronized(bufferedWriter){
+        bufferedWriter.write(message);
         bufferedWriter.newLine();
         bufferedWriter.flush();
       }
-    }
-
-    sc.close();
-    } catch (IOException e) {
-      closeAll(socket, bufferedReader, bufferedWriter);
-      e.printStackTrace();
+    } 
+    catch (IOException e) {
+      System.out.println("SERVER has stopped responding");
+      closeAll(clientSocket, bufferedReader, bufferedWriter);
     }
   }
 
   public void ReadMessage(){
     new Thread(
-      new Runnable(){
+      new Runnable() {
         @Override
         public void run(){
-          String message;
-
-          while(socket.isConnected()){
-            try{
+          try{
+            String message;
+            while(clientSocket.isConnected()){
               message = bufferedReader.readLine();
+
               if(message == null){
-                System.out.println("Server disconnected. Exiting...");
                 break;
               }
-              System.out.print(message);
-            }
-            catch(IOException e){
-              closeAll(socket, bufferedReader, bufferedWriter);
-              e.printStackTrace();
+              
+              System.out.println(message);
             }
           }
+          catch(IOException e){
+            e.printStackTrace();
+            System.out.println("SERVER has stopped responding");
+          }
+          finally{
+            System.out.println("SERVER is disconnected");
+            closeAll(clientSocket, bufferedReader, bufferedWriter);
+          }
         }
-      }).start();
+      }
+    ).start();
   }
 
-  public void closeAll(Socket socket, BufferedReader buffReader, BufferedWriter buffWriter) {
+  public static void closeAll(Socket socket, BufferedReader buffReader, BufferedWriter buffWriter) {
     try {
       if (buffReader != null) {
         buffReader.close();
@@ -85,6 +85,8 @@ public class Client {
       if (socket != null) {
         socket.close();
       }
+
+      System.exit(0);
     } catch (IOException e) {
       e.printStackTrace();
     }
@@ -95,20 +97,35 @@ public class Client {
     System.out.println("Enter your name");
     System.out.flush();
     String name = sc.nextLine();
-    sc.close();
     System.out.println("Connecting to Server");
 
     try{
       InetAddress localhost = InetAddress.getLocalHost();
-      Socket socket = new Socket(localhost.getHostAddress(), 5000);
+      Socket clinetSocket = new Socket(localhost.getHostAddress(), 5000);
       System.out.println("Connection established");
-      Client client = new Client(socket, name);
+      Client client = new Client(clinetSocket, name);
       client.ReadMessage();
-      client.SendMessage();
+      
+      while (true) {
+        System.out.println("Enter your message (or type 'exit' to quit): ");
+        System.out.flush();
+        String message = sc.nextLine();
+
+        if(message.equalsIgnoreCase("exit")){
+          break;
+        }
+
+        client.SendMessage(message);
+      }
     }
     catch(IOException e){
       e.printStackTrace();
       System.out.println("Connection Failed");
+    }
+    finally{
+      sc.close();
+      System.out.println("Disconnecting from SERVER");
+      System.exit(0);
     }
   }
 }

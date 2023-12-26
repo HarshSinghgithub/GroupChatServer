@@ -15,11 +15,12 @@ public class Server {
 
   public void serverStart() {
     try {
+      String thread = Thread.currentThread().getName();
       while (!serverSocket.isClosed()) {
-        Socket socket = serverSocket.accept();
-        System.out.println("Client connected");
-
-        ClientHandler clientHandler = new ClientHandler(socket);
+        System.out.println("Thread: " + thread + " waiting for Clinet");
+        Socket serversidedClientSocket = serverSocket.accept();
+        
+        ClientHandler clientHandler = new ClientHandler(serversidedClientSocket);
 
         executorService.submit(clientHandler);
       }
@@ -42,7 +43,6 @@ public class Server {
     try {
       ServerSocket serverSocket = new ServerSocket(5000);
       System.out.println("Starting SERVER....");
-      System.out.flush();
       Server server = new Server(serverSocket);
       System.out.println("SERVER Started");
       System.out.flush();
